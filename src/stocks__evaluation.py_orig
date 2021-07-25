@@ -1,0 +1,423 @@
+    # -*- coding: utf-8 -*-
+import matplotlib.pyplot as plt
+import numpy as np
+from pandas_datareader import data, wb, stooq
+from moving_average_trend import MovingAverageTrend
+from matplotlib.patches import Polygon
+from mplfinance.original_flavor import candlestick_ohlc as candlestick
+import matplotlib.dates as dates
+import random
+
+from time import time
+from datetime import datetime
+
+from optparse import OptionParser
+from bs4 import BeautifulSoup
+
+import time
+import interrupter_thread
+import selenium_ctrl
+
+import global_page_paths as gpp
+from db_engine import DbEngine
+from db_engine import DbSession
+
+from stock_data_db import Base, StockDataDb
+import change_tracker
+
+
+#from textmagic.rest import TextmagicRestClient
+from smsapi.client import SmsApiPlClient
+
+def read_stock_data(source, symbol,
+                    start_date='1/1/2015',
+                    end_date=datetime.today().strftime('%d/%m/%Y')):
+    stock_data = data.DataReader(symbol, data_source=source,
+                                start=start_date,
+                                end=end_date)
+    '''stock_data = stooq.StooqDailyReader(symbol,
+                            start='1/1/2015',
+                            end=datetime.today().strftime('%d/%m/%Y'))'''
+    return stock_data.reset_index()
+
+def evaluate_stocks(options):
+    
+    if options.company_sym == "__all__":
+        pass
+    else:
+        stock_data = read_stock_data(options.data_source,
+                                     options.company_sym)
+        
+        mat = MovingAverageTrend(stock_data,
+                                 options.margin,
+                                 options.lower_trend,
+                                 options.upper_trend)
+
+        mat.calculate_rolling_mean_strategy()
+        mat.draw_results()
+
+def plots_excersises_simple():
+    np.random.seed(20000)
+    y = np.random.standard_normal((20,2)).cumsum(axis=0)
+    plt.figure(figsize=(7,4))
+    plt.plot(y[:, 0], lw=1.5, label='1st')
+    plt.plot(y[:, 1], lw=1.5, label='2nd')
+    plt.plot(y, 'ro')
+    plt.grid(True)
+    plt.legend(loc=0)
+    plt.axis('tight')
+    plt.xlabel('index')
+    plt.ylabel('value')
+    plt.title('A Simple Plot')
+
+def plot_excersises_2axis():
+    np.random.seed(20000)
+    y = np.random.standard_normal((20,2)).cumsum(axis=0)
+    fig, ax1 = plt.subplots()
+    plt.plot(y[:, 0], lw=1.5, label='1st')
+    plt.plot(y, 'ro')
+    plt.grid(True)
+    plt.legend(loc=8)
+    plt.axis('tight')
+    plt.xlabel('index')
+    plt.ylabel('value 1st')
+    plt.title('A Simple Plot')
+    ax2 = ax1.twinx()
+    plt.plot(y[:, 1], lw=1.5, label='2nd')
+    plt.plot(y, 'ro')
+    plt.grid(True)
+    plt.legend(loc=0)
+    plt.ylabel('value 2nd')
+
+def plot_excersises_2graph():
+    np.random.seed(20000)
+    y = np.random.standard_normal((20,2)).cumsum(axis=0)
+    plt.subplot(121)
+    plt.plot(y[:, 0], lw=1.5, label='1st')
+    plt.plot(y, 'ro')
+    plt.grid(True)
+    plt.legend(loc=8)
+    plt.axis('tight')
+    plt.xlabel('index')
+    plt.ylabel('value')
+    plt.title('1st data set')
+    plt.subplot(122)
+    plt.bar(np.arange(len(y)), y[:,1], width=0.5, color='g', label='2nd')
+    plt.grid(True)
+    plt.legend(loc=0)
+    plt.axis('tight')
+    plt.xlabel('index')
+    plt.ylabel('value')
+    plt.title('2nd data set')
+
+def plot_excersises_scattered():
+    np.random.seed(20000)
+    y = np.random.standard_normal((1000, 2))
+    #plt.plot(y[:,0], y[:,1], 'ro')
+    c = np.random.randint(0, 10, len(y))
+    plt.scatter(y[:,0], y[:,1], c=c, marker='o')
+    plt.colorbar()
+    plt.grid(True)
+    plt.xlabel('1st')
+    plt.ylabel('2nd')
+    plt.title('Scatter plot')
+
+def plot_excersises_hist():
+    np.random.seed(20000)
+    y = np.random.standard_normal((1000, 2))
+    plt.hist(y, label=['1st', '2nd'], bins=50, histtype='bar')
+    plt.grid(True)
+    plt.legend(loc=0)
+    plt.xlabel('value')
+    plt.ylabel('frequency')
+    plt.title('Histogram')
+
+def plot_excersises_boxplot():
+    np.random.seed(20000)
+    y = np.random.standard_normal((1000, 2))
+    #plt.hist(y, label=['1st', '2nd'], bins=50, histtype='bar')
+    fig, ax = plt.subplots(figsize=(7, 4))
+    plt.boxplot(y)
+    plt.grid(True)
+    plt.setp(ax, xticklabels=['1st', '2nd'])
+    plt.legend(loc=0)
+    plt.xlabel('data set')
+    plt.ylabel('value')
+    plt.title('Boxplot')
+
+def func(x):
+    return 0.5 * np.exp(x) + 1
+    
+
+def plot_excersises_various():
+    
+    a, b = 0.5, 1.5 #integral limits
+    x = np.linspace(0, 2)
+    y = func(x)
+    fig, ax = plt.subplots(figsize=(7, 5))
+    plt.plot(x, y, 'b', linewidth=2)
+    plt.ylim(ymin=0)
+    # Illustrate the integral value, i.e. the area under the function
+    # between the lower and upper limits
+    Ix = np.linspace(a, b)
+    Iy = func(Ix)
+    verts = [(a, 0)] + list(zip(Ix, Iy)) + [(b, 0)]
+    poly = Polygon(verts, facecolor='0.7', edgecolor='0.5')
+    ax.add_patch(poly)
+    
+    plt.text(0.5 * (a + b), 1, r"$\int_a^b f(x)\mathrm{d}x$",
+                 horizontalalignment='center', fontsize=20)
+
+    plt.figtext(0.9, 0.075, '$x$')
+    plt.figtext(0.075, 0.9, '$f(x)$')
+    ax.set_xticks((a, b))
+    ax.set_xticklabels(('$a$', '$b$'))
+    ax.set_yticks([func(a), func(b)])
+    ax.set_yticklabels(('$f(a)$', '$f(b)$'))
+    plt.grid(True)
+    
+def plot_finance():
+    start = (2014, 5, 1)
+    end = (2015, 6, 30)
+    quotes = read_stock_data("yahoo",
+                             "^DJI")
+
+    #tab = [[a for a in range(3)] for a in range(3)]
+    #print(tab[2:])
+    #print(quotes[:2])
+    #print(quotes.info())
+    fig, ax = plt.subplots(figsize=(8, 5))
+    fig.subplots_adjust(bottom=0.2)
+    #mpf.candlestick(ax, quotes, width=0.6, colorup='b', colordown='r')
+    print("OK1")
+    print(quotes.info())
+    print(quotes.__dict__)
+    print("OKK")
+    print(quotes.Date)
+    print("OK2")
+    columns_order = ['Date', 'Open', 'High', 'Low', 'Close', 'Volume', 'Adj Close']
+    reordered_quotes = quotes.reindex(columns=columns_order)
+    #reordered_quotes = [[quotes['Date'], quotes['Open'],
+    #                           quotes['High'],quotes['Low'],
+    #                           quotes['Close'],quotes['Volume'],
+    #                           quotes['Adj Close']]]
+    reordered_quotes['Date'] = dates.date2num(reordered_quotes['Date'])
+    np_quotes = reordered_quotes.to_numpy()
+    candlestick(ax, np_quotes, width=0.6, colorup='b', colordown='r')
+    plt.grid(True)
+    ax.xaxis_date()
+    # dates on the x-axis
+    ax.autoscale_view()
+    plt.setp(plt.gca().get_xticklabels(), rotation=30)
+
+
+def get_url(connection_session, url, symbol_lower):
+    symbol_html = connection_session.get(url)
+    parsed_html = BeautifulSoup(symbol_html.text, features="lxml")
+    #print(symbol_lower)
+    if parsed_html.body.find('span', attrs={'id': 'aq_'+ symbol_lower+'_c1'}):
+        print(parsed_html.body.find('span', attrs={'id': 'aq_'+ symbol_lower+'_c1'}).text)
+    elif parsed_html.body.find('span', attrs={'id': 'aq_'+ symbol_lower+'_c2'}):
+        print(parsed_html.body.find('span', attrs={'id': 'aq_'+ symbol_lower+'_c2'}).text)
+    elif parsed_html.body.find('span', attrs={'id': 'aq_'+ symbol_lower+'_c3'}):
+        print(parsed_html.body.find('span', attrs={'id': 'aq_'+ symbol_lower+'_c3'}).text)
+    elif parsed_html.body.find('span', attrs={'id': 'aq_'+ symbol_lower+'_c0'}):
+        print(parsed_html.body.find('span', attrs={'id': 'aq_'+ symbol_lower+'_c0'}).text)
+    elif parsed_html.body.find('span', attrs={'id': 'aq_'+ symbol_lower+'_c4'}):
+        print(parsed_html.body.find('span', attrs={'id': 'aq_'+ symbol_lower+'_c4'}).text)
+    else:
+        print('aq' + symbol_lower + 'cx missing')
+
+    if parsed_html.body.find('span', attrs={'id': 'aq_'+ symbol_lower+'_m2'}):             
+        print(parsed_html.body.find('span', attrs={'id': 'aq_'+ symbol_lower+'_m2'}).text)
+    else:
+        print('aq_'+ symbol_lower+'_m2 missing')
+        
+    if parsed_html.body.find('span', attrs={'id': 'aq_' + symbol_lower+'_m3'}):
+        print(parsed_html.body.find('span', attrs={'id': 'aq_' + symbol_lower+'_m3'}).text)
+    else:
+        print('aq_' + symbol_lower + '_m3 missing')
+
+    if parsed_html.body.find('span', attrs={'id': 'aq_' + symbol_lower + '_v2'}):
+        print(parsed_html.body.find('span', attrs={'id': 'aq_'+symbol_lower + '_v2'}).text)
+    else:
+        print('aq_' + symbol_lower + '_v2 missing')
+
+    if parsed_html.body.find('span', attrs={'id': 'aq_' + symbol_lower + '_r2'}):
+        print(parsed_html.body.find('span', attrs={'id': 'aq_' + symbol_lower + '_r2'}).text)
+    else:
+        print('aq_'+symbol_lower + '_r2 missing')
+
+
+def get_one_of_value(browser, xpath1, xpath2):
+    symbol_lower = None
+    value = None
+    if browser.check_element_by_xpath(xpath1):
+        symbol_lower, value = browser.get_element_by_xpath(xpath1)
+    elif browser.check_element_by_xpath(xpath2):
+        symbol_lower, value = browser.get_element_by_xpath(xpath2)
+        
+    return symbol_lower, value
+
+def get_one_of_value_global(browser, xpath1, xpath2):
+    symbol_lower = None
+    value = None
+    if browser.check_element_by_xpath(xpath1):
+        symbol_lower, value = browser.get_element_by_xpath_global(xpath1)
+    elif browser.check_element_by_xpath(xpath2):
+        symbol_lower, value = browser.get_element_by_xpath_global(xpath2)
+
+    return symbol_lower, value
+
+def get_stooq_data(mdb_engine):
+    #with open('./data/symbols_short.csv', newline='') as csvfile:
+    #with open('../data/symbols.csv', newline='') as csvfile:
+
+    '''with open('../data/symbols_hight.csv', newline='') as csvfile:
+        symbols = csv.reader(csvfile)
+        all_symbols = list()
+        for symbol_line in symbols:
+            all_symbols += symbol_line'''
+
+
+    #username="MP ctw"
+    #token="NmqSXibumJiWI3iRStf3dvXdwURtaarc5PVPGODH"
+    #client=SmsApiPlClient(access_token=token)
+    #send_results = client.sms.send(to="694927941", message="Hello ctw")
+    #for result in send_results:
+    #    print(result.id, result.points, result.error)
+
+    stop_processing = False
+    interrupter = interrupter_thread.InterrupterThread(stop_processing)
+    interrupter.start()
+
+    tracker_thread = change_tracker.ChangeTracker(mdb_engine)
+    tracker_thread.start()
+
+    db_session = DbSession(mdb_engine)
+    Base.metadata.create_all(mdb_engine)
+
+    #start selenium thread
+    browser = selenium_ctrl.SeleniumCtrl()
+    browser.start()
+    browser.join()
+
+    selenium_ctrl.connect()
+
+    for tab in range(1,12,1):
+        try:
+            url ='https://stooq.pl/t/tr/?m=2&l=' + str(tab)
+            browser.new_tab_global(url, tab)
+            time.sleep(random.randint(1,3))
+        except ConnectionError:
+            selenium_ctrl.connect()
+            continue
+
+    tb_monitored = set()
+    while not interrupter.should_interrupt():
+        browser.switch_tab_global()
+        for index in range(1,50,1):
+            index_lower, code = get_one_of_value_global(browser, gpp.get_symbol(str(index)), None)
+            index_lower, change = get_one_of_value_global(browser, gpp.get_change(str(index)), None)
+            #print("Instrument: " + code.text + " change: " + change.text)
+            change = float(change.strip(" %"))
+            if change > 5.0 or change < -5.0:
+                tracker_thread.add_to_be_monitored(change)
+        time.sleep(random.randint(2,4))
+
+
+    '''print("Should interrupt " + str(interrupter.should_interrupt()))
+    for symbol in all_symbols:
+        print(symbol)
+        try:
+            if interrupter.should_interrupt():
+                break;
+            symbol_lower = symbol.strip().lower()
+            url = 'https://stooq.com/q/?s=' + symbol_lower
+            browser.new_tab(url, symbol_lower)
+            time.sleep(random.randint(1,5))
+        except ConnectionError:
+            connection_session = connect()
+            continue
+
+    while not interrupter.should_interrupt():
+        browser.switch_tab()
+        try:
+            stock_object = StockDataWebElems()
+
+            symbol_lower,stock_object.last_value = get_one_of_value(browser, pp.last_xpath1, pp.last_xpath2)
+            stock_object.set_symbol(symbol_lower)
+            _,stock_object.change_value = get_one_of_value(browser, pp.change_value_xpath1, pp.change_value_xpath2)
+            _,stock_object.change_perc = get_one_of_value(browser, pp.change_perc_xpath1, pp.change_perc_xpath2)
+            _,stock_object.date_value = get_one_of_value(browser, pp.date_xpath1, pp.date_xpath2)
+            _,stock_object.time_value = get_one_of_value(browser, pp.time_xpath1, pp.time_xpath2)
+            _,stock_object.high_value = get_one_of_value(browser, pp.high_xpath1, pp.high_xpath2)
+            _,stock_object.low_value = get_one_of_value(browser, pp.low_xpath1, pp.low_xpath2)
+            _,stock_object._52w_change_value = get_one_of_value(browser, pp._52w_change_value_xpath1, pp._52w_change_value_xpath2)
+            _,stock_object._52w_change_perc = get_one_of_value(browser, pp._52w_change_perc_xpath1, pp._52w_change_perc_xpath2)
+            _,stock_object._52w_all = get_one_of_value(browser, pp._52w_all_xpath1, pp._52w_all_xpath2)
+            _,stock_object.open_value = get_one_of_value(browser, pp.open_xpath1, pp.open_xpath2)
+            _,stock_object.prev_value = get_one_of_value(browser, pp.prev_xpath1, pp.prev_xpath2)
+            _,stock_object.bid_value = get_one_of_value(browser, pp.bid_value_xpath1, pp.bid_value_xpath2)
+            _,stock_object.bid_amount = get_one_of_value(browser, pp.bid_amount_xpath1, pp.bid_amount_xpath2)
+            _,stock_object.ask_value = get_one_of_value(browser, pp.ask_value_xpath1, pp.ask_value_xpath2)
+            _,stock_object.ask_amount = get_one_of_value(browser, pp.ask_amount_xpath1, pp.ask_amount_xpath2)
+            _,stock_object.volume_value = get_one_of_value(browser, pp.volume_xpath1, pp.volume_xpath2)
+            _,stock_object.turnover_value = get_one_of_value(browser, pp.turnover_xpath1, pp.turnover_xpath2)
+            _,stock_object.open_int_value = get_one_of_value(browser, pp.open_int_xpath1, pp.open_int_xpath2)
+            _,stock_object.no_trades_value = get_one_of_value(browser, pp.no_trades_xpath1, pp.no_trades_xpath2)
+
+            symbol_lower = symbol_lower if symbol_lower else "Unknown symbol"
+            print(symbol_lower + ":\n" + str(stock_object))
+            db_object = StockData(stock_object)
+            print(db_object)
+            db_session.persist_tick(db_object)
+
+            print("-----------------------------------")
+
+        except NoSuchElementException:
+            pass'''
+
+    browser.close()
+
+
+def create_db_connection():
+    connection_string = "postgresql://ctw_user:gumtree321@localhost:5432/ctw_db"
+    mdb_engine = DbEngine(connection_string)
+    return mdb_engine.get_instance()
+
+if __name__ == "__main__":
+    parser = OptionParser("Options for stocks evaluation")
+
+    parser.add_option("-s", "--source", type=str,
+                      help="Source of the trade data", dest="data_source")
+    parser.add_option("-c", "--company", type=str,
+                      help="Company symbol (__all__ means all companies)",
+                      dest="company_sym")
+    parser.add_option('-m', "--margin", type=int,
+                      help="Margin for moving average", dest='margin')
+    parser.add_option('-l', "--lower_trend", type=int,
+                      help="Lower trading days margin for moving average \
+                            trend strategy", dest="lower_trend")
+    parser.add_option('-u', "--upper_trend", type=int,
+                      help="Upper trading days margin for moving average \
+                            trend strategy", dest="upper_trend")
+
+    
+    (options, args) = parser.parse_args()
+    mdb_engine = create_db_connection()
+    get_stooq_data(mdb_engine)
+    #plot_finance() # not working - not enough parameters to unpack in stock data
+    #plot_excersises_various()
+    #plot_excersises_boxplot()
+    #plot_excersises_hist()
+    #plot_excersises_scattered()
+    #plot_excersises_2graph()
+    #plot_excersises_2axis()
+    #plots_excersises_simple()
+    #evaluate_stocks(options)
+    #calculate_implied_volat()
+    #bsm_analytical()
+    #monte_carlo_python()
+    #monte_carlo_scipy()
+    #monte_carlo_scipy_full_vectorization()
